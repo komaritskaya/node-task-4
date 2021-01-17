@@ -3,7 +3,7 @@ const http = require('http')
 const postOptions = {
   hostname: 'localhost',
   port: 8080,
-  path: '/',
+  path: '/names',
   method: 'POST',
   headers: {
     'iknowyoursecret': 'TheOwlsAreNotWhatTheySeem',
