@@ -1,0 +1,24 @@
+{
+  "name": "node-task-3",
+  "version": "1.0.0",
+  "description": "* **server.js** - server that gets the requests (runs on port :8080, built w/Express.js); * **client.js** - POST request to be listened by server.js (accepted if contains headers \"iknowyoursecret\": \"TheOwlsAreNotWhatTheySeem\", declined if not).",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/komaritskaya/node-task-3.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/komaritskaya/node-task-3/issues"
+  },
+  "homepage": "https://github.com/komaritskaya/node-task-3#readme",
+  "dependencies": {
+    "body-parser": "^1.19.0",
+    "express": "^4.17.1"
+  }
+}
