@@ -1,17 +1,15 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const fs = require('fs');
-const dbName = "names.json";
+const mongoose = require('mongoose');
 
 const app = express();
 const port = 8080;
 
 let names = [];
 
-if (fs.existsSync(dbName)) {
-  names = JSON.parse(fs.readFileSync(dbName, "utf8"));
-  console.log('names read from file >>>>', names);
-}
+mongoose.connect("mongodb://localhost:27017");
+const UserSchema = mongoose.Schema({name: String});
+const User = mongoose.model("Users", UserSchema);
 
 const checkMethod = (request, response, next) => {
   if (request.method === 'GET') {
@@ -51,15 +49,18 @@ const checkName = (request, response, next) => {
   } else {
     name = 'stranger'
   }
-  names.push(name);
-  console.log(`${name} entered the room`);
-  response.writeHead(200, { "Content-Type": "text/plain" });
-  fs.writeFile(dbName, JSON.stringify(names), (err) => {
-    if (err) {
-      throw err;
+  
+  const user = new User({name});
+  user.save((error, savedUser) => {
+    if (error) {
+      throw error;
     }
+    const {name} = savedUser;
+    names.push(name);
+    console.log(`${name} entered the room`);
+    response.writeHead(200, { "Content-Type": "text/plain" });
+    response.end(`Hello ${name}!`);
   });
-  response.end(`Hello ${names.join(', ')}!`);
 }
 
 app.use(bodyParser.json());
@@ -73,4 +74,8 @@ app.listen(port, (err) => {
   }
   
   console.log(`Server listening on port ${port}`);
+  
+  User.find({}, (err, users) => {
+    console.log("Currently in the room: ", users.map(u => u.name).join(', '));
+  })
 })
