@@ -1,72 +1,98 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
+const passport = require('passport');
+const LocalStrategy = require('passport-local');
+const BearerStrategy = require('passport-http-bearer');
+const jwt = require('jsonwebtoken')
 
 const app = express();
 const port = 8080;
 
-let names = [];
+const secret = 'TheOwlsAreNotWhatTheySeem';
 
-mongoose.connect("mongodb://localhost:27017");
-const UserSchema = mongoose.Schema({name: String});
-const User = mongoose.model("Users", UserSchema);
+mongoose.connect("mongodb://localhost:27017/lesson05", {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+const UserSchema = new mongoose.Schema({name: String, password: String, jwt: String});
+const User = mongoose.model("User", UserSchema);
 
-const checkMethod = (request, response, next) => {
-  if (request.method === 'GET') {
-    console.log('Somebody\'s using a wrong method');
-  } else if (request.method === 'POST') {
-    console.log('Somebody\'s using a right method');
+const localStrategy = new LocalStrategy(
+  {
+    usernameField: 'name',
+    passwordField: 'password',
+  }, (name, password, done) => {
+    User.find({ name: name, password: password })
+      .exec()
+      .then((foundUsers) => {
+        if (!foundUsers || !foundUsers.length) {
+          done('Not found');
+        } else {
+          done(null, foundUsers[0]);
+        }
+      });
   }
-  next();
-}
+);
 
-const checkPath = (request, response, next) => {
-  if (request.path !== '/names') {
-    console.log('Somebody\'s trying to reach a wrong path');
-    response.end(`Check your path, kiddo!`);
-  } else {
-    console.log('Path OK');
-    next();
-  }
-}
-
-const checkSecret = (request, response, next) => {
-  if (
-    request.headers.iknowyoursecret === 'TheOwlsAreNotWhatTheySeem'
-  ) {
-    console.log('Access granted');
-    console.log('Accessed by url', request.url);
-    next();
-  } else {
-    response.end(`Get the hell outta here`);
-  }
-}
-
-const checkName = (request, response, next) => {
-  let name;
-  if (request.headers.name) {
-    name = request.headers.name;
-  } else {
-    name = 'stranger'
-  }
-  
-  const user = new User({name});
-  user.save((error, savedUser) => {
-    if (error) {
-      throw error;
-    }
-    const {name} = savedUser;
-    names.push(name);
-    console.log(`${name} entered the room`);
-    response.writeHead(200, { "Content-Type": "text/plain" });
-    response.end(`Hello ${name}!`);
+const bearerStrategy = new BearerStrategy((token, done) => {
+  User.findOne({ token: token })
+    .exec()
+    .then((foundUser) => {
+      if (!foundUser) {
+        done('Not found');
+      }
+      else {
+        done(null, foundUser);
+      }
   });
-}
+});
+
+passport.serializeUser((user, done) => {
+  const token = jwt.sign(
+    { name: user.name },
+    secret,
+    { expiresIn: '48h' },
+  );
+  User.updateOne(
+    { name: user.name },
+    { jwt: token },
+    (err, updatedUser) => {
+      console.log('user >>>', updatedUser);
+      console.log('err >>>', err);
+      done(null, jwt);
+    }
+  )
+});
+passport.deserializeUser((user, done) => {
+  done(null, user);
+});
 
 app.use(bodyParser.json());
-app.use(checkMethod, checkPath, checkSecret);
+passport.use('local', localStrategy);
+passport.use('bearer', bearerStrategy);
+app.use(passport.initialize());
 
-app.post('/names', checkName);
+app.post('/token', passport.authenticate('local', {
+  successRedirect: '/success',
+  failureRedirect: '/failure',
+}));
+
+app.get('/:name', passport.authenticate('bearer', { session: false }),
+(req, res) => {
+  User.find({ name: req.params.name })
+    .exec()
+    .then((foundUsers) => {
+      if (!foundUsers || !foundUsers.length) {
+        const particularUser = new User({ name: req.params.name });
+        particularUser.save((err, user) => {
+          res.send(`Hello ${user.name}!`);
+        });
+      } else {
+        res.send(`Hello ${foundUsers[0].name}!`);
+      }
+    })
+})
 
 app.listen(port, (err) => {
   if (err) {
@@ -76,6 +102,6 @@ app.listen(port, (err) => {
   console.log(`Server listening on port ${port}`);
   
   User.find({}, (err, users) => {
-    console.log("Currently in the room: ", users.map(u => u.name).join(', '));
+    console.log("Currently in the room:\n", users.map(u => u.name + ' ' + u.jwt).join('\n'));
   })
 })
